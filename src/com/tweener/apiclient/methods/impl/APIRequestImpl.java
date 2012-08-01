@@ -9,13 +9,15 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.xml.SimpleXmlHttpMessageConverter;
 import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.RestTemplate;
 
 import com.tweener.apiclient.UserSession;
 import com.tweener.apiclient.exceptions.APIHttpRequestException;
 import com.tweener.apiclient.methods.APIRequest;
+import com.tweener.apiclient.methods.parsers.APIResponseParser;
+import com.tweener.apiclient.methods.parsers.impl.JSONParser;
+import com.tweener.apiclient.methods.parsers.impl.TextParser;
+import com.tweener.apiclient.methods.parsers.impl.XMLParser;
 import com.tweener.apiclient.utils.SSLUtils;
 
 public class APIRequestImpl implements APIRequest
@@ -48,13 +50,7 @@ public class APIRequestImpl implements APIRequest
 
             HttpEntity< ? > requestEntity = new HttpEntity<Object>(requestHeaders);
 
-            RestTemplate restTemplate = new RestTemplate();
-            restTemplate.getMessageConverters().add(new SimpleXmlHttpMessageConverter());
-
-            ResponseEntity< ? > responseEntity =
-                restTemplate.exchange(uri, HttpMethod.GET, requestEntity, clazz);
-
-            return responseEntity.getBody();
+            return parseResponse(uri, HttpMethod.GET, requestEntity, clazz, accept);
         }
         catch (HttpClientErrorException e)
         {
@@ -101,5 +97,28 @@ public class APIRequestImpl implements APIRequest
         // }
 
         return null;
+    }
+
+    private Object parseResponse(final String url, final HttpMethod method,
+        final HttpEntity< ? > entity, final Class< ? > clazz, final String acceptedMediaType)
+    {
+        // Choose the appropriate parser matching the application mediaType
+        APIResponseParser parser = null;
+
+        if (acceptedMediaType.toLowerCase().contains("xml"))
+        {
+            parser = new XMLParser();
+        }
+        else if (acceptedMediaType.toLowerCase().contains("json"))
+        {
+            parser = new JSONParser();
+        }
+        else
+        {
+            parser = new TextParser();
+        }
+
+        ResponseEntity< ? > response = parser.parse(url, method, entity, clazz);
+        return response.getBody();
     }
 }
